@@ -17,9 +17,6 @@ public class Worker : IHostedService
 
     private string nowAIMessage = "";
 
-    // 是否已经丢弃首包的WAV音频头
-    private bool hasDiscardedWavHeader = false;
-
     public Worker(AudioService audioService, WebSocketService webSocketService, ILogger<Worker> logger, IOptions<SessionUpdateOptions> sessionUpdateOptions)
     {
         _logger = logger;
@@ -31,20 +28,10 @@ public class Worker : IHostedService
 
         _audioService = audioService;
         _audioService.OnAudioDataAvailable += HandleAudioDataAvailable;
-        _audioService.OnRecordingStopped += () =>
-        {
-            hasDiscardedWavHeader = false;
-        };
     }
 
     private async Task HandleAudioDataAvailable(byte[] obj)
     {
-        if (!hasDiscardedWavHeader)
-        {
-            // 丢弃首包的WAV音频头
-            hasDiscardedWavHeader = true;
-            return;
-        }
         // 处理接收到的音频数据  转为 base64
         var message = new BaseMessage
         {

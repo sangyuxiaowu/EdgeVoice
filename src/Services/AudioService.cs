@@ -12,6 +12,11 @@ public class AudioService : IDisposable
     public event Func<byte[], Task> OnAudioDataAvailable;
     public event Action OnRecordingStopped;
 
+    /// <summary>
+    /// 是否已经丢弃首包的WAV音频头
+    /// </summary>
+    private bool hasDiscardedWavHeader = false;
+
     public AudioService(IOptions<AudioSettings> audioSettings)
     {
         var settings = audioSettings.Value;
@@ -33,6 +38,15 @@ public class AudioService : IDisposable
         {
             if (OnAudioDataAvailable != null)
             {
+                if (!hasDiscardedWavHeader)
+                {
+                    hasDiscardedWavHeader = true;
+                    data = data[44..];
+                    if (data.Length == 0)
+                    {
+                        return;
+                    }
+                }
                 await Task.Run(() => OnAudioDataAvailable(data));
             }
         }, _cancellationTokenSource.Token), _cancellationTokenSource.Token);
@@ -40,6 +54,7 @@ public class AudioService : IDisposable
 
     public void StopRecording()
     {
+        hasDiscardedWavHeader = false;
         _cancellationTokenSource?.Cancel();
         OnRecordingStopped?.Invoke();
     }
