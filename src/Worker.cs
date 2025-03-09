@@ -41,7 +41,6 @@ public class Worker : IHostedService
 
     private async Task HandleWebSocketConnected()
     {
-        _logger.LogInformation("WebSocket connected!");
         var upinfo = new
         {
             type = "session.update",
