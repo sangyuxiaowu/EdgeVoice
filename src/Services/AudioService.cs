@@ -1,17 +1,20 @@
 using Alsa.Net;
+using Microsoft.Extensions.Options;
 
 public class AudioService
 {
     private readonly SoundDeviceSettings _settings;
 
-    public AudioService()
+    public AudioService(IOptions<AudioSettings> audioSettings)
     {
+        var settings = audioSettings.Value;
         _settings = new SoundDeviceSettings()
         {
-            MixerDeviceName = "hw:0", // 混音设备名称
-            PlaybackDeviceName = "hw:0", // 播放设备名称
-            RecordingDeviceName = "hw:0", // 录音设备名称
-            RecordingSampleRate = 16_000
+            MixerDeviceName = settings.MixerDeviceName, // 混音设备名称
+            PlaybackDeviceName = settings.PlaybackDeviceName, // 播放设备名称
+            RecordingDeviceName = settings.RecordingDeviceName, // 录音设备名称
+            RecordingSampleRate = settings.RecordingSampleRate, // 录音采样率
+            RecordingBitsPerSample = settings.RecordingBitsPerSample, // 录音采样位数
         };
     }
 
