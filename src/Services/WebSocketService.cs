@@ -4,16 +4,16 @@ using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-public class WebSocketService
+public class WebSocketService : IDisposable
 {
     private readonly ILogger<WebSocketService> _logger;
     private readonly RealtimeAPIOptions _options;
     private ClientWebSocket _client;
     
 
-    public event Action<string> OnMessageReceived;
-    public event Action OnConnected;
-    public event Action OnDisconnected;
+    public event Func<string, Task> OnMessageReceived = _ => Task.CompletedTask;
+    public event Func<Task> OnConnected = () => Task.CompletedTask;
+    public event Func<Task> OnDisconnected = () => Task.CompletedTask;
 
     public WebSocketService(IOptions<RealtimeAPIOptions> options, ILogger<WebSocketService> logger)
     {
@@ -22,7 +22,7 @@ public class WebSocketService
         _logger = logger;
     }
 
-    public async Task ConnectAsync()
+    public async Task ConnectAsync(CancellationToken cancellationToken = default)
     {
         var wssUrl = new Uri($"wss://{_options.Endpoint}/openai/realtime?api-version={_options.ApiVersion}&deployment={_options.Deployment}&api-key={_options.ApiKey}");
 
@@ -30,7 +30,7 @@ public class WebSocketService
 
         try
         {
-            await _client.ConnectAsync(wssUrl, CancellationToken.None);
+            await _client.ConnectAsync(wssUrl, cancellationToken);
         }
         catch (WebSocketException ex) when (ex.WebSocketErrorCode == WebSocketError.ConnectionClosedPrematurely)
         {
@@ -40,40 +40,48 @@ public class WebSocketService
 
         _logger.LogInformation("WebSocket connected!");
         
-        OnConnected?.Invoke();
+        await OnConnected.Invoke();
 
-        _ = ReceiveLoopAsync();
+        _ = ReceiveLoopAsync(cancellationToken);
     }
 
-    public async Task SendAsync(string message)
+    public async Task SendAsync(string message, CancellationToken cancellationToken = default)
     {
         var buffer = Encoding.UTF8.GetBytes(message);
-        await _client.SendAsync(new ArraySegment<byte>(buffer), WebSocketMessageType.Text, true, CancellationToken.None);
+        await _client.SendAsync(new ArraySegment<byte>(buffer), WebSocketMessageType.Text, true, cancellationToken);
     }
 
-    private async Task ReceiveLoopAsync()
+    private async Task ReceiveLoopAsync(CancellationToken cancellationToken)
     {
         var buffer = new byte[1024 * 4];
-        while (_client.State == WebSocketState.Open)
+        while (_client.State == WebSocketState.Open && !cancellationToken.IsCancellationRequested)
         {
-            var result = await _client.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
+            var result = await _client.ReceiveAsync(new ArraySegment<byte>(buffer), cancellationToken);
             if (result.MessageType == WebSocketMessageType.Close)
             {
-                await _client.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None);
-                Console.WriteLine("WebSocket closed!");
+                await _client.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", cancellationToken);
+                _logger.LogInformation("WebSocket closed!");
+
+                await OnDisconnected.Invoke();
             }
             else
             {
                 var message = Encoding.UTF8.GetString(buffer, 0, result.Count);
-                OnMessageReceived?.Invoke(message);
-                Console.WriteLine($"Received: {message}");
+                await OnMessageReceived.Invoke(message);
+                _logger.LogDebug($"Received: {message}");
             }
         }
     }
 
-    public async Task CloseAsync()
+    public async Task CloseAsync(CancellationToken cancellationToken = default)
     {
-        await _client.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None);
-        Console.WriteLine("WebSocket closed!");
+        await _client.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", cancellationToken);
+        _logger.LogInformation("WebSocket closed!");
+        await OnDisconnected.Invoke();
+    }
+
+    public void Dispose()
+    {
+        _client?.Dispose();
     }
 }
