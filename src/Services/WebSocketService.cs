@@ -24,7 +24,7 @@ public class WebSocketService : IDisposable
 
     public async Task ConnectAsync(CancellationToken cancellationToken = default)
     {
-        var wssUrl = new Uri($"wss://{_options.Endpoint}/openai/realtime?api-version={_options.ApiVersion}&deployment={_options.Deployment}&api-key={_options.ApiKey}");
+        var wssUrl = new Uri($"{(_options.IsSecure?"wss":"ws")}://{_options.Endpoint}/openai/realtime?api-version={_options.ApiVersion}&deployment={_options.Deployment}&api-key={_options.ApiKey}");
 
         _logger.LogInformation($"Connecting to {_options.Endpoint}");
 
