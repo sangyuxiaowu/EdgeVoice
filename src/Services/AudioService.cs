@@ -1,9 +1,16 @@
 using Alsa.Net;
 using Microsoft.Extensions.Options;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
 
-public class AudioService
+public class AudioService : IDisposable
 {
     private readonly SoundDeviceSettings _settings;
+    private CancellationTokenSource _cancellationTokenSource;
+
+    public event Func<byte[], Task> OnAudioDataAvailable;
+    public event Action OnRecordingStopped;
 
     public AudioService(IOptions<AudioSettings> audioSettings)
     {
@@ -18,17 +25,27 @@ public class AudioService
         };
     }
 
-    public void RecordAudio(string filePath, uint duration)
+    public async Task StartRecordingAsync()
     {
+        _cancellationTokenSource = new CancellationTokenSource();
         using var alsaDevice = AlsaDeviceBuilder.Create(_settings);
-        Console.WriteLine("Recording...");
-        alsaDevice.Record(duration, filePath);
+        await Task.Run(() => alsaDevice.Record(async (data) => 
+        {
+            if (OnAudioDataAvailable != null)
+            {
+                await Task.Run(() => OnAudioDataAvailable(data));
+            }
+        }, _cancellationTokenSource.Token), _cancellationTokenSource.Token);
     }
 
-    public void PlayAudio(string filePath)
+    public void StopRecording()
     {
-        using var alsaDevice = AlsaDeviceBuilder.Create(_settings);
-        Console.WriteLine("Playing...");
-        alsaDevice.Play(filePath);
+        _cancellationTokenSource?.Cancel();
+        OnRecordingStopped?.Invoke();
+    }
+
+    public void Dispose()
+    {
+        _cancellationTokenSource?.Cancel();
     }
 }
