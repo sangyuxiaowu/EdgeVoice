@@ -49,11 +49,13 @@ public class AudioService : IDisposable
                 if (!hasDiscardedWavHeader)
                 {
                     hasDiscardedWavHeader = true;
-                    data = data[44..];
-                    if (data.Length == 0)
-                    {
-                        return;
-                    }
+                    return; // 丢弃整个首包
+                    // 丢弃WAV音频头
+                    //data = data[44..];
+                    //if (data.Length == 0)
+                    //{
+                    //    return;
+                    //}
                 }
 
                 // 如果缓冲区不够大，动态扩展缓冲区
