@@ -54,6 +54,8 @@ public class WebSocketService : IDisposable
     private async Task ReceiveLoopAsync(CancellationToken cancellationToken)
     {
         var buffer = new byte[1024 * 4];
+        var messageBuffer = new List<byte>();
+
         while (_client.State == WebSocketState.Open && !cancellationToken.IsCancellationRequested)
         {
             var result = await _client.ReceiveAsync(new ArraySegment<byte>(buffer), cancellationToken);
@@ -66,9 +68,15 @@ public class WebSocketService : IDisposable
             }
             else
             {
-                var message = Encoding.UTF8.GetString(buffer, 0, result.Count);
-                await OnMessageReceived.Invoke(message);
-                _logger.LogDebug($"Received: {message}");
+                messageBuffer.AddRange(buffer.Take(result.Count));
+
+                if (result.EndOfMessage)
+                {
+                    var message = Encoding.UTF8.GetString(messageBuffer.ToArray());
+                    await OnMessageReceived.Invoke(message);
+                    _logger.LogDebug($"Received: {message}");
+                    messageBuffer.Clear();
+                }
             }
         }
     }
