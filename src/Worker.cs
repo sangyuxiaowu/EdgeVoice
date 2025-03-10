@@ -45,11 +45,22 @@ public class Worker : IHostedService
     {
         await _webSocketService.ConnectAsync();
         await _audioService.StartRecordingAsync();
-
         //_audioService.RecordAudio("output.wav", 10);
         //_audioService.PlayAudio("output.wav");
 
         //await _webSocketService.SendAsync("Audio recording and playback completed.");
+    }
+
+    private async Task TestSendAsync(){
+        await Task.Delay(2000);
+        var pcmDate = await File.ReadAllBytesAsync("test.pcm");
+        // 30 * 256 字节发送一次
+        for (int i = 0; i < pcmDate.Length; i += 30 * 256)
+        {
+            var data = pcmDate.Skip(i).Take(30 * 256).ToArray();
+            await HandleAudioDataAvailable(data);
+            await Task.Delay(300);
+        }
     }
 
     private async Task HandleWebSocketMessage(string message)
@@ -98,6 +109,7 @@ public class Worker : IHostedService
 
     public Task StopAsync(CancellationToken cancellationToken)
     {
+        _logger.LogInformation("Worker stopping...");
         _audioService.StopRecording();
         return _webSocketService.CloseAsync();
     }
