@@ -80,6 +80,7 @@ public class Worker : IHostedService
                 break;
             default:
                 _logger.LogWarning($"Received message with unknown type: {baseMessage.Type}");
+                _logger.LogWarning(message);
                 break;
         }
     }
