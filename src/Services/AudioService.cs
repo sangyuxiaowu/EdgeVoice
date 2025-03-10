@@ -8,10 +8,6 @@ public class AudioService : IDisposable
 {
     private readonly SoundDeviceSettings _settings;
     private CancellationTokenSource _cancellationTokenSource;
-    private int _packetCount;
-    private int _packetThreshold;
-    private byte[] _buffer;
-    private int _bufferIndex;
 
     public event Func<byte[], Task> OnAudioDataAvailable;
     public event Action OnRecordingStopped;
@@ -20,6 +16,10 @@ public class AudioService : IDisposable
     /// 是否已经丢弃首包的WAV音频头
     /// </summary>
     private bool hasDiscardedWavHeader = false;
+
+    private readonly Queue<byte[]> _packetQueue = new Queue<byte[]>();
+    private const int PacketThreshold = 30;
+    private const int PacketSize = 256;
 
     public AudioService(IOptions<AudioSettings> audioSettings)
     {
@@ -33,10 +33,6 @@ public class AudioService : IDisposable
             RecordingBitsPerSample = settings.RecordingBitsPerSample, // 录音采样位数
             //RecordingChannels = 1, // 录音通道数  单通道录音Alsa.Net会报错
         };
-        _packetThreshold = 20; // 数据包阈值
-        _packetCount = 0;
-        _buffer = new byte[_packetThreshold * 1024]; // 初始缓冲区大小，假设每个包最大为1024字节
-        _bufferIndex = 0;
     }
 
     public async Task StartRecordingAsync()
@@ -47,7 +43,7 @@ public class AudioService : IDisposable
         {
             if (OnAudioDataAvailable != null)
             {
-                Console.WriteLine($"Received {data.Length} bytes of audio data.");
+                
                 if (!hasDiscardedWavHeader)
                 {
                     hasDiscardedWavHeader = true;
@@ -55,27 +51,33 @@ public class AudioService : IDisposable
                 }
                 // 将数据改为单声道
                 data = ConvertStereoToMono(data);
+                // data 512 转换后为 256 字节
 
-                // 如果缓冲区不够大，动态扩展缓冲区
-                if (_bufferIndex + data.Length > _buffer.Length)
+                _packetQueue.Enqueue(data);
+
+                if (_packetQueue.Count >= PacketThreshold)
                 {
-                    Array.Resize(ref _buffer, _buffer.Length + _packetThreshold * 1024);
+                    await SendPackets();
                 }
-
-                // 将数据写入缓冲区
-                Array.Copy(data, 0, _buffer, _bufferIndex, data.Length);
-                _bufferIndex += data.Length;
-                _packetCount++;
-
-                // 当数据包达到阈值时，触发事件
-                if (_packetCount >= _packetThreshold)
-                {
-                    _packetCount = 0;
-                    await Task.Run(() => OnAudioDataAvailable(_buffer[.._bufferIndex]));
-                    _bufferIndex = 0;
-                }
+                
             }
         }, _cancellationTokenSource.Token), _cancellationTokenSource.Token);
+    }
+
+    private async Task SendPackets()
+    {
+        int totalSize = PacketThreshold * PacketSize;
+        byte[] combinedPacket = new byte[totalSize];
+        int offset = 0;
+
+        while (_packetQueue.Count > 0)
+        {
+            byte[] packet = _packetQueue.Dequeue();
+            Buffer.BlockCopy(packet, 0, combinedPacket, offset, PacketSize);
+            offset += PacketSize;
+        }
+
+        await OnAudioDataAvailable(combinedPacket);
     }
 
     private byte[] ConvertStereoToMono(byte[] stereoData)
