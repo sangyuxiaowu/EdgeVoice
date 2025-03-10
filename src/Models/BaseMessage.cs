@@ -1,5 +1,7 @@
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Unicode;
 public class BaseMessage
 {
     [JsonPropertyName("type")]
@@ -31,6 +33,9 @@ public class BaseMessage
 
     public string ToJson()
     {
-        return JsonSerializer.Serialize(this);
+        return JsonSerializer.Serialize(this, new JsonSerializerOptions
+        {
+            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        });
     }
 }
