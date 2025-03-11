@@ -45,6 +45,7 @@ public class Worker : IHostedService
     {
         await _webSocketService.ConnectAsync();
         await _audioService.StartRecordingAsync();
+        //await TestSendAsync();
         //_audioService.RecordAudio("output.wav", 10);
         //_audioService.PlayAudio("output.wav");
 
@@ -74,6 +75,26 @@ public class Worker : IHostedService
         }
         switch (baseMessage.Type)
         {
+            case "session.created":
+                // 接入成功
+                break;
+            case "session.updated":
+                // 更新配置成功
+                break;
+            case "input_audio_buffer.speech_started":
+                // 用户开始说话
+                _logger.LogInformation("User started speaking.");
+                break;
+            case "input_audio_buffer.speech_stopped":
+                // 用户结束说话
+                _logger.LogInformation("User stopped speaking.");
+                break;
+            case "input_audio_buffer.committed":
+                // 用户音频提交
+                _logger.LogInformation("User audio committed.");
+
+                _audioService.StopRecording();
+                break;
             case "conversation.item.input_audio_transcription.completed":
                 // 用户音频转文本完成
                 _logger.LogInformation($"User: {baseMessage.Transcript}");
@@ -82,13 +103,35 @@ public class Worker : IHostedService
             case "response.content_part.added":
                 // AI 准备文本回复
                 nowAIMessage = "";
-                _logger.LogInformation("AI: ");
                 break;
             case "response.audio_transcript.delta":
                 // AI 文本回复
                 nowAIMessage += baseMessage.Delta;
-                _logger.LogInformation(baseMessage.Delta);
+                //_logger.LogInformation(baseMessage.Delta);
                 break;
+            case "response.audio_transcript.done":
+                // AI 文本回复完成
+                _logger.LogInformation(nowAIMessage);
+                break;
+            case "response.audio.delta":
+                // AI 音频回复
+                // base64 解码
+                _logger.LogInformation("AI audio reply.");
+                var audioData = Convert.FromBase64String(baseMessage.Delta);
+                await _audioService.PlayAudioAsync(audioData);
+                break;
+            case "response.audio.done":
+                // 音频回复完成
+                break;
+            case "conversation.item.created":
+            case "response.output_item.added":
+            case "response.output_item.done":
+            case "response.content_part.done":
+            case "response.created":
+            case "response.done":
+            case "rate_limits.updated":
+                break;
+
             default:
                 _logger.LogWarning($"Received message with unknown type: {baseMessage.Type}");
                 _logger.LogWarning(message);
