@@ -85,7 +85,8 @@ public class AudioService : IDisposable
 
     public async Task PlayAudioAsync(byte[] pcmData)
     {
-        _playbackQueue.Enqueue(pcmData);
+        var monoData = ConvertMonoToStereo(pcmData);
+        _playbackQueue.Enqueue(monoData);
 
         if (!_isPlaying)
         {
@@ -106,7 +107,7 @@ public class AudioService : IDisposable
     private void Play(byte[] pcmData)
     {
         // 创建 WAV 头
-        byte[] wavHeader = CreateWavHeader();
+        byte[] wavHeader = CreateWavHeader(22050, 16, 2);
         // 组合 WAV 头和 PCM 数据
         byte[] wavData = new byte[wavHeader.Length + pcmData.Length];
         wavHeader.CopyTo(wavData, 0);

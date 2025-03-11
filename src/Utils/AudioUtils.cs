@@ -33,6 +33,33 @@ public static class AudioUtils
         return monoData;
     }
 
+    public static byte[] ConvertMonoToStereo(byte[] monoData)
+    {
+        // 确保数据长度是2的倍数（单声道16位样本）
+        if (monoData.Length % 2 != 0)
+        {
+            throw new ArgumentException("输入数据长度必须是2的倍数");
+        }
+
+        // 双声道数据长度是单声道的两倍（每样本2字节）
+        byte[] stereoData = new byte[monoData.Length * 2];
+
+        for (int i = 0; i < monoData.Length; i += 2)
+        {
+            // 提取单声道样本（16位有符号整数）
+            short monoValue = BitConverter.ToInt16(monoData, i);
+
+            // 将单声道样本复制到左声道和右声道
+            byte[] stereoBytes = BitConverter.GetBytes(monoValue);
+            stereoData[i * 2] = stereoBytes[0];       // 左声道低字节
+            stereoData[i * 2 + 1] = stereoBytes[1];   // 左声道高字节
+            stereoData[i * 2 + 2] = stereoBytes[0];   // 右声道低字节
+            stereoData[i * 2 + 3] = stereoBytes[1];   // 右声道高字节
+        }
+
+        return stereoData;
+    }
+
     public static byte[] CreateWavHeader(int sampleRate = 22050, short bitsPerSample = 16, short channels = 1)
     {
         MemoryStream memoryStream = new MemoryStream();
