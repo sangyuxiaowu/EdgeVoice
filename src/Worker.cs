@@ -92,8 +92,6 @@ public class Worker : IHostedService
             case "input_audio_buffer.committed":
                 // 用户音频提交
                 _logger.LogInformation("User audio committed.");
-
-                _audioService.StopRecording();
                 break;
             case "conversation.item.input_audio_transcription.completed":
                 // 用户音频转文本完成
@@ -116,7 +114,6 @@ public class Worker : IHostedService
             case "response.audio.delta":
                 // AI 音频回复
                 // base64 解码
-                _logger.LogInformation("AI audio reply.");
                 var audioData = Convert.FromBase64String(baseMessage.Delta);
                 await _audioService.PlayAudioAsync(audioData);
                 break;
