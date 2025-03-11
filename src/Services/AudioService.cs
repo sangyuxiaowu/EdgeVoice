@@ -1,13 +1,14 @@
 using Alsa.Net;
 using Microsoft.Extensions.Options;
-using System;
-using System.Threading;
-using System.Threading.Tasks;
+using System.Collections.Concurrent;
+using static AudioUtils;
 
 public class AudioService : IDisposable
 {
     private readonly SoundDeviceSettings _settings;
-    private CancellationTokenSource _cancellationTokenSource;
+    private CancellationTokenSource _cancellationTokenSourceRecording;
+
+    private CancellationTokenSource _cancellationTokenSourcePlayback = new CancellationTokenSource();
 
     public event Func<byte[], Task> OnAudioDataAvailable;
     public event Action OnRecordingStopped;
@@ -20,6 +21,8 @@ public class AudioService : IDisposable
     private readonly Queue<byte[]> _packetQueue = new Queue<byte[]>();
     private const int PacketThreshold = 30;
     private const int PacketSize = 256;
+    private readonly ConcurrentQueue<byte[]> _playbackQueue = new ConcurrentQueue<byte[]>();
+    private bool _isPlaying = false;
 
     public AudioService(IOptions<AudioSettings> audioSettings)
     {
@@ -37,7 +40,7 @@ public class AudioService : IDisposable
 
     public async Task StartRecordingAsync()
     {
-        _cancellationTokenSource = new CancellationTokenSource();
+        _cancellationTokenSourceRecording = new CancellationTokenSource();
         using var alsaDevice = AlsaDeviceBuilder.Create(_settings);
         await Task.Run(() => alsaDevice.Record(async (data) => 
         {
@@ -61,7 +64,7 @@ public class AudioService : IDisposable
                 }
                 
             }
-        }, _cancellationTokenSource.Token), _cancellationTokenSource.Token);
+        }, _cancellationTokenSourceRecording.Token), _cancellationTokenSourceRecording.Token);
     }
 
     private async Task SendPackets()
@@ -80,46 +83,56 @@ public class AudioService : IDisposable
         await OnAudioDataAvailable(combinedPacket);
     }
 
-    private byte[] ConvertStereoToMono(byte[] stereoData)
+    public async Task PlayAudioAsync(byte[] pcmData)
     {
-        // 确保数据长度是4的倍数（双声道16位样本）
-        if (stereoData.Length % 4 != 0)
+        _playbackQueue.Enqueue(pcmData);
+
+        if (!_isPlaying)
         {
-            throw new ArgumentException("输入数据长度必须是4的倍数");
+            _isPlaying = true;
+            await Task.Run(() => ProcessPlaybackQueue());
         }
-
-        // 单声道数据长度是双声道的一半（每样本2字节）
-        byte[] monoData = new byte[stereoData.Length / 2];
-        
-        for (int i = 0; i < stereoData.Length; i += 4)
-        {
-            // 提取左声道样本（16位有符号整数）
-            short left = BitConverter.ToInt16(stereoData, i);
-            // 提取右声道样本（16位有符号整数）
-            short right = BitConverter.ToInt16(stereoData, i + 2);
-
-            // 计算平均值（注意防止溢出）
-            short monoValue = (short)((left + right) / 2);
-
-            // 将结果写入单声道数据
-            byte[] monoBytes = BitConverter.GetBytes(monoValue);
-            monoData[i / 2] = monoBytes[0];     // 低字节
-            monoData[i / 2 + 1] = monoBytes[1]; // 高字节
-        }
-
-        return monoData;
     }
 
+    private void ProcessPlaybackQueue()
+    {
+        while (_playbackQueue.TryDequeue(out var pcmData))
+        {
+            Play(pcmData);
+        }
+        _isPlaying = false;
+    }
+
+    private void Play(byte[] pcmData)
+    {
+        // 创建 WAV 头
+        byte[] wavHeader = CreateWavHeader();
+        // 组合 WAV 头和 PCM 数据
+        byte[] wavData = new byte[wavHeader.Length + pcmData.Length];
+        wavHeader.CopyTo(wavData, 0);
+        pcmData.CopyTo(wavData, wavHeader.Length);
+        using var alsaDevice = AlsaDeviceBuilder.Create(_settings);
+        alsaDevice.Play(new MemoryStream(wavData), _cancellationTokenSourcePlayback.Token);
+    }
+
+    private void StopPlayback()
+    {
+        _cancellationTokenSourcePlayback?.Cancel();
+        _cancellationTokenSourcePlayback = new CancellationTokenSource();
+        _isPlaying = false;
+        _playbackQueue.Clear();
+    }
 
     public void StopRecording()
     {
         hasDiscardedWavHeader = false;
-        _cancellationTokenSource?.Cancel();
+        _cancellationTokenSourceRecording?.Cancel();
         OnRecordingStopped?.Invoke();
     }
 
     public void Dispose()
     {
-        _cancellationTokenSource?.Cancel();
+        _cancellationTokenSourceRecording?.Cancel();
+        _cancellationTokenSourcePlayback?.Cancel();
     }
 }
