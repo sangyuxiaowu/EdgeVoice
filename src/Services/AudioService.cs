@@ -24,6 +24,8 @@ public class AudioService : IDisposable
     private readonly ConcurrentQueue<byte[]> _playbackQueue = new ConcurrentQueue<byte[]>();
     private bool _isPlaying = false;
 
+    private ISoundDevice _alsaDevice;
+
     public AudioService(IOptions<AudioSettings> audioSettings)
     {
         var settings = audioSettings.Value;
@@ -36,13 +38,14 @@ public class AudioService : IDisposable
             RecordingBitsPerSample = settings.RecordingBitsPerSample, // 录音采样位数
             //RecordingChannels = 1, // 录音通道数  单通道录音Alsa.Net会报错
         };
+        _alsaDevice = AlsaDeviceBuilder.Create(_settings);
     }
 
     public async Task StartRecordingAsync()
     {
         _cancellationTokenSourceRecording = new CancellationTokenSource();
-        using var alsaDevice = AlsaDeviceBuilder.Create(_settings);
-        await Task.Run(() => alsaDevice.Record(async (data) => 
+        //using var alsaDevice = AlsaDeviceBuilder.Create(_settings);
+        await Task.Run(() => _alsaDevice.Record(async (data) => 
         {
             if (OnAudioDataAvailable != null)
             {
@@ -112,8 +115,8 @@ public class AudioService : IDisposable
         byte[] wavData = new byte[wavHeader.Length + pcmData.Length];
         wavHeader.CopyTo(wavData, 0);
         pcmData.CopyTo(wavData, wavHeader.Length);
-        using var alsaDevice = AlsaDeviceBuilder.Create(_settings);
-        alsaDevice.Play(new MemoryStream(wavData), _cancellationTokenSourcePlayback.Token);
+        //using var alsaDevice = AlsaDeviceBuilder.Create(_settings);
+        _alsaDevice.Play(new MemoryStream(wavData), _cancellationTokenSourcePlayback.Token);
     }
 
     private void StopPlayback()
@@ -135,5 +138,6 @@ public class AudioService : IDisposable
     {
         _cancellationTokenSourceRecording?.Cancel();
         _cancellationTokenSourcePlayback?.Cancel();
+        _alsaDevice?.Dispose();
     }
 }
