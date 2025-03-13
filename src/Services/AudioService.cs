@@ -31,6 +31,12 @@ public class AudioService : IDisposable
     public event Action? OnRecordingStopped;
 
     /// <summary>
+    /// 播放完毕事件
+    /// </summary>
+    public event Action? OnPlaybackStopped;
+
+
+    /// <summary>
     /// 是否已经丢弃首包的WAV音频头
     /// </summary>
     private bool hasDiscardedWavHeader = false;
@@ -41,6 +47,7 @@ public class AudioService : IDisposable
     private readonly Queue<byte[]> _packetQueue = new Queue<byte[]>();
     private const int PacketThreshold = 30;
     private const int PacketSize = 256;
+    private bool _isRecording = false;
     
     /// <summary>
     /// 播放队列
@@ -72,9 +79,16 @@ public class AudioService : IDisposable
         _alsaDevice = AlsaDeviceBuilder.Create(_settings);
     }
 
+    #region 录音
+
     public async Task StartRecordingAsync()
     {
+        if (_isRecording)
+        {
+            return;
+        }
         _cancellationTokenSourceRecording = new CancellationTokenSource();
+        _isRecording = true;
         //using var alsaDevice = AlsaDeviceBuilder.Create(_settings);
         await Task.Run(() => _alsaDevice.Record(async (data) => 
         {
@@ -84,6 +98,10 @@ public class AudioService : IDisposable
                 if (!hasDiscardedWavHeader)
                 {
                     hasDiscardedWavHeader = true;
+                    return;
+                }
+                if (!_isRecording)
+                {
                     return;
                 }
                 // 将数据改为单声道
@@ -103,21 +121,42 @@ public class AudioService : IDisposable
 
     private async Task SendPackets()
     {
+        if(!_isRecording){
+            return;
+        }
+
         int totalSize = PacketThreshold * PacketSize;
         byte[] combinedPacket = new byte[totalSize];
         int offset = 0;
 
-        while (_packetQueue.Count > 0)
+        // 将队列中的数据合并为一个包，直到队列为空或者数据包已满
+        while (_packetQueue.Count > 0 && offset + PacketSize <= totalSize)
         {
             byte[] packet = _packetQueue.Dequeue();
-            Buffer.BlockCopy(packet, 0, combinedPacket, offset, PacketSize);
-            offset += PacketSize;
+            if (packet.Length == PacketSize)
+            {
+                Buffer.BlockCopy(packet, 0, combinedPacket, offset, PacketSize);
+                offset += PacketSize;
+            }
         }
 
-        if (OnAudioDataAvailable != null){
+        if (OnAudioDataAvailable != null && offset > 0){
             await OnAudioDataAvailable(combinedPacket);
         }
     }
+
+    public void StopRecording()
+    {
+        _isRecording = false;
+        hasDiscardedWavHeader = false;
+        _cancellationTokenSourceRecording?.Cancel();
+        OnRecordingStopped?.Invoke();
+    }
+
+    #endregion
+
+
+    #region 流式播放
 
     public async Task PlayAudioAsync(byte[] pcmData)
     {
@@ -138,6 +177,7 @@ public class AudioService : IDisposable
             Play(pcmData);
         }
         _isPlaying = false;
+        OnPlaybackStopped?.Invoke();
     }
 
     private void Play(byte[] pcmData)
@@ -154,6 +194,8 @@ public class AudioService : IDisposable
         _isPlaying = false;
         _playbackQueue.Clear();
     }
+
+    #endregion
 
     #region 音频文件保存和播放
 
