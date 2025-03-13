@@ -28,9 +28,17 @@ public class LcdService : IDisposable
     // 滚动文本长度限制
     private const int MaxScrollTextLength = 100;
     
+    // 圆角安全距离
+    private const int CornerSafetyMargin = 15;
+    
     // Skia相关对象
     private SKTypeface _typeface;
     private SKBitmap _bitmapImage;
+
+    // 增加内容变化标志
+    private bool _contentChanged = true;
+    private string _lastUserText = "";
+    private string _lastAiText = "";
 
     public LcdService(ILogger<LcdService> logger, IOptions<LcdSettings> settings)
     {
@@ -118,11 +126,12 @@ public class LcdService : IDisposable
                 paint.IsAntialias = true;
                 paint.Typeface = _typeface;
                 
-                canvas.DrawText("欢迎使用AI助手", 20, 40, paint);
+                // 考虑圆角安全距离
+                canvas.DrawText("欢迎使用AI助手", CornerSafetyMargin, 40 + CornerSafetyMargin, paint);
                 
                 paint.Color = SKColors.Cyan;
                 paint.TextSize = 20;
-                canvas.DrawText("等待对话开始...", 20, 80, paint);
+                canvas.DrawText("等待对话开始...", CornerSafetyMargin, 80 + CornerSafetyMargin, paint);
             }
         }
         
@@ -138,8 +147,32 @@ public class LcdService : IDisposable
         {
             while (!_displayUpdateCts.Token.IsCancellationRequested)
             {
-                await UpdateDisplayAsync();
-                await Task.Delay(_settings.RefreshDelay, _displayUpdateCts.Token);
+                bool updated = false;
+                
+                await _semaphore.WaitAsync();
+                try 
+                {
+                    // 只有当内容变化时才更新显示
+                    if (_contentChanged)
+                    {
+                        updated = true;
+                        await UpdateDisplayAsync();
+                        _contentChanged = false;
+                        
+                        // 更新最后显示的内容
+                        _lastUserText = _currentUserText;
+                        _lastAiText = _currentAiText;
+                    }
+                }
+                finally
+                {
+                    _semaphore.Release();
+                }
+                
+                // 如果更新了显示，使用正常的刷新延迟
+                // 如果没有更新，使用较长的延迟以减少轮询频率
+                int delay = updated ? _settings.RefreshDelay : Math.Max(_settings.RefreshDelay * 5, 1000);
+                await Task.Delay(delay, _displayUpdateCts.Token);
             }
         }
         catch (OperationCanceledException)
@@ -163,9 +196,15 @@ public class LcdService : IDisposable
         await _semaphore.WaitAsync();
         try
         {
-            _currentUserText = text;
-            // 重置滚动索引
-            _userTextScrollIndex = 0;
+            // 检查内容是否发生变化
+            if (_currentUserText != text)
+            {
+                _currentUserText = text;
+                // 重置滚动索引
+                _userTextScrollIndex = 0;
+                // 标记内容已变化
+                _contentChanged = true;
+            }
         }
         finally
         {
@@ -180,9 +219,15 @@ public class LcdService : IDisposable
         await _semaphore.WaitAsync();
         try
         {
-            _currentAiText = text;
-            // 重置滚动索引
-            _aiTextScrollIndex = 0;
+            // 检查内容是否发生变化
+            if (_currentAiText != text)
+            {
+                _currentAiText = text;
+                // 重置滚动索引
+                _aiTextScrollIndex = 0;
+                // 标记内容已变化
+                _contentChanged = true;
+            }
         }
         finally
         {
@@ -194,7 +239,6 @@ public class LcdService : IDisposable
     {
         if (!_isInitialized) return;
         
-        await _semaphore.WaitAsync();
         try
         {
             using (var canvas = new SKCanvas(_bitmapImage))
@@ -207,15 +251,18 @@ public class LcdService : IDisposable
                     paint.IsAntialias = true;
                     paint.Typeface = _typeface;
                     
-                    // 绘制标题和分隔线
+                    // 考虑圆角安全距离调整标题和分隔线位置
                     paint.Color = SKColors.Yellow;
                     paint.TextSize = 20;
-                    canvas.DrawText("用户:", 10, 25, paint);
+                    canvas.DrawText("用户:", CornerSafetyMargin, 25 + CornerSafetyMargin, paint);
                     
-                    // 绘制分隔线
+                    // 绘制分隔线，考虑圆角
                     paint.Color = SKColors.Gray;
                     paint.StrokeWidth = 1;
-                    canvas.DrawLine(5, 35, _settings.Width - 5, 35, paint);
+                    canvas.DrawLine(
+                        CornerSafetyMargin, 35 + CornerSafetyMargin, 
+                        _settings.Width - CornerSafetyMargin, 35 + CornerSafetyMargin, 
+                        paint);
                     
                     // 处理用户文本
                     string userDisplayText = _currentUserText;
@@ -224,20 +271,23 @@ public class LcdService : IDisposable
                         userDisplayText = userDisplayText.Substring(0, MaxScrollTextLength) + "...";
                     }
                     
-                    // 用户文本换行显示
+                    // 用户文本换行显示，考虑圆角
                     paint.Color = SKColors.White;
                     paint.TextSize = 16;
-                    WrapAndDrawText(canvas, paint, userDisplayText, 10, 55);
+                    WrapAndDrawText(canvas, paint, userDisplayText, CornerSafetyMargin, 55 + CornerSafetyMargin);
                     
-                    // 绘制AI回复标题和分隔线
+                    // 绘制AI回复标题和分隔线，考虑圆角
                     paint.Color = SKColors.Green;
                     paint.TextSize = 20;
-                    canvas.DrawText("AI:", 10, 135, paint);
+                    canvas.DrawText("AI:", CornerSafetyMargin, 135 + CornerSafetyMargin/2, paint);
                     
-                    // 绘制分隔线
+                    // 绘制分隔线，考虑圆角
                     paint.Color = SKColors.Gray;
                     paint.StrokeWidth = 1;
-                    canvas.DrawLine(5, 145, _settings.Width - 5, 145, paint);
+                    canvas.DrawLine(
+                        CornerSafetyMargin, 145 + CornerSafetyMargin/2, 
+                        _settings.Width - CornerSafetyMargin, 145 + CornerSafetyMargin/2, 
+                        paint);
                     
                     // 处理AI文本
                     string aiDisplayText = _currentAiText;
@@ -246,33 +296,33 @@ public class LcdService : IDisposable
                         aiDisplayText = aiDisplayText.Substring(0, MaxScrollTextLength) + "...";
                     }
                     
-                    // AI文本换行显示
+                    // AI文本换行显示，考虑圆角
                     paint.Color = SKColors.Cyan;
                     paint.TextSize = 16;
-                    WrapAndDrawText(canvas, paint, aiDisplayText, 10, 165);
+                    WrapAndDrawText(canvas, paint, aiDisplayText, CornerSafetyMargin, 165 + CornerSafetyMargin/2);
                 }
             }
             // 更新显示
             _display.DrawBitmap(BitmapImage.CreateFromStream(new MemoryStream(_bitmapImage.Encode(SKEncodedImageFormat.Png, 100).ToArray())) , new Point(0,0), new Rectangle(0, 0, _settings.Width, _settings.Height), true);
+            
+            _logger.LogDebug("显示已更新");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "更新NV3030B显示时出错");
         }
-        finally
-        {
-            _semaphore.Release();
-        }
     }
     
-    // 文本换行显示
+    // 文本换行显示，考虑圆角安全距离
     private void WrapAndDrawText(SKCanvas canvas, SKPaint paint, string text, int x, int y)
     {
         if (string.IsNullOrEmpty(text))
             return;
             
         float fontSize = paint.TextSize;
-        int charsPerLine = (int)((_settings.Width - x * 2) / (fontSize / 2)); // 根据字体大小计算每行字符数
+        // 考虑两边的安全距离
+        int effectiveWidth = _settings.Width - (CornerSafetyMargin * 2);
+        int charsPerLine = (int)((effectiveWidth - x) / (fontSize / 2)); // 根据字体大小计算每行字符数
         float yPos = y;
         
         for (int i = 0; i < text.Length; i += charsPerLine)
@@ -284,9 +334,23 @@ public class LcdService : IDisposable
             canvas.DrawText(line, x, yPos, paint);
             yPos += fontSize + 4; // 行间距
             
-            // 防止绘制超出屏幕
-            if (yPos > _settings.Height - fontSize)
+            // 防止绘制超出屏幕底部安全区域
+            if (yPos > _settings.Height - fontSize - CornerSafetyMargin)
                 break;
+        }
+    }
+
+    // 增加手动触发刷新的方法，用于必要时强制刷新
+    public async Task ForceRefreshAsync()
+    {
+        await _semaphore.WaitAsync();
+        try
+        {
+            _contentChanged = true;
+        }
+        finally
+        {
+            _semaphore.Release();
         }
     }
 
