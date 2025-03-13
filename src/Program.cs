@@ -10,6 +10,12 @@ class Program
 {
     static async Task Main(string[] args)
     {
+        // 创建 audio 保存文件夹
+        if (!Directory.Exists("audio"))
+        {
+            Directory.CreateDirectory("audio");
+        }
+
         var host = CreateHostBuilder(args).Build();
         await host.RunAsync();
     }
