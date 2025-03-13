@@ -5,27 +5,58 @@ using static AudioUtils;
 
 public class AudioService : IDisposable
 {
+    /// <summary>
+    /// 音频设备设置
+    /// </summary>
     private readonly SoundDeviceSettings _settings;
-    private CancellationTokenSource _cancellationTokenSourceRecording;
+    
+    /// <summary>
+    /// 录音取消令牌源
+    /// </summary>
+    private CancellationTokenSource? _cancellationTokenSourceRecording;
 
+    /// <summary>
+    /// 播放取消令牌源
+    /// </summary>
     private CancellationTokenSource _cancellationTokenSourcePlayback = new CancellationTokenSource();
 
-    public event Func<byte[], Task> OnAudioDataAvailable;
-    public event Action OnRecordingStopped;
+    /// <summary>
+    /// 音频数据可用事件
+    /// </summary>
+    public event Func<byte[], Task>? OnAudioDataAvailable;
+    
+    /// <summary>
+    /// 录音停止事件
+    /// </summary>
+    public event Action? OnRecordingStopped;
 
     /// <summary>
     /// 是否已经丢弃首包的WAV音频头
     /// </summary>
     private bool hasDiscardedWavHeader = false;
 
+    /// <summary>
+    /// 音频数据包队列
+    /// </summary>
     private readonly Queue<byte[]> _packetQueue = new Queue<byte[]>();
     private const int PacketThreshold = 30;
     private const int PacketSize = 256;
+    
+    /// <summary>
+    /// 播放队列
+    /// </summary>
     private readonly ConcurrentQueue<byte[]> _playbackQueue = new ConcurrentQueue<byte[]>();
     private bool _isPlaying = false;
 
+    /// <summary>
+    /// Alsa音频设备
+    /// </summary>
     private ISoundDevice _alsaDevice;
 
+    /// <summary>
+    /// 音频服务
+    /// </summary>
+    /// <param name="audioSettings"></param>
     public AudioService(IOptions<AudioSettings> audioSettings)
     {
         var settings = audioSettings.Value;
@@ -83,7 +114,9 @@ public class AudioService : IDisposable
             offset += PacketSize;
         }
 
-        await OnAudioDataAvailable(combinedPacket);
+        if (OnAudioDataAvailable != null){
+            await OnAudioDataAvailable(combinedPacket);
+        }
     }
 
     public async Task PlayAudioAsync(byte[] pcmData)
