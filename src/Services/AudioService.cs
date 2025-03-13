@@ -155,12 +155,43 @@ public class AudioService : IDisposable
         _playbackQueue.Clear();
     }
 
-    public void StopRecording()
+    #region 音频文件保存和播放
+
+    public async Task SaveAudio(string audioId, byte[] pcmData)
     {
-        hasDiscardedWavHeader = false;
-        _cancellationTokenSourceRecording?.Cancel();
-        OnRecordingStopped?.Invoke();
+        string filePath = $"audio/{audioId}.wav";
+        var monoData = ConvertMonoToStereo(pcmData);
+        byte[] wavData;
+        if (!File.Exists(filePath))
+        {
+            byte[] wavHeader = CreateWavHeader(22050, 16, 2);
+            wavData = wavHeader.Concat(monoData).ToArray();
+            await File.WriteAllBytesAsync(filePath, wavData);
+        }
+        else
+        {
+            using (var fileStream = new FileStream(filePath, FileMode.Append, FileAccess.Write))
+            {
+                await fileStream.WriteAsync(monoData, 0, monoData.Length);
+            }
+        }
     }
+
+    public async Task PlayAudio(string audioId)
+    {
+        string filePath = $"audio/{audioId}.wav";
+        if (!File.Exists(filePath))
+        {
+            return;
+        }
+        await Task.Run(() =>{
+            //using var alsaDevice = AlsaDeviceBuilder.Create(_settings);
+            _alsaDevice.Play(filePath, _cancellationTokenSourcePlayback.Token);
+            OnPlaybackStopped?.Invoke();
+        }, _cancellationTokenSourcePlayback.Token); 
+    }
+
+    #endregion
 
     public void Dispose()
     {
