@@ -96,12 +96,11 @@ public class LcdService : IDisposable
         // 初始化位图
         _bitmapImage = new SKBitmap(_settings.Width, _settings.Height, true);
 
-        // 显示欢迎消息
-        _display.ClearScreen(Color.Black, true);
-        DrawWelcomeScreen();
-        
         // 设置背光
         _display.SetBacklight(80);
+        _display.ClearScreen(Color.Black, true);
+        // 显示欢迎消息
+        DrawWelcomeScreen();
     }
     
     private void DrawWelcomeScreen()
