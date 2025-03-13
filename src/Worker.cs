@@ -10,6 +10,7 @@ public class Worker : IHostedService
     private readonly ILogger<Worker> _logger;
     private readonly AudioService _audioService;
     private readonly WebSocketService _webSocketService;
+    private readonly LcdService _lcdService;
 
     private readonly SessionUpdateOptions _sessionUpdateOptions;
 
@@ -17,7 +18,7 @@ public class Worker : IHostedService
 
     private string nowAIMessage = "";
 
-    public Worker(AudioService audioService, WebSocketService webSocketService, ILogger<Worker> logger, IOptions<SessionUpdateOptions> sessionUpdateOptions)
+    public Worker(AudioService audioService, WebSocketService webSocketService, LcdService lcdService, ILogger<Worker> logger, IOptions<SessionUpdateOptions> sessionUpdateOptions)
     {
         _logger = logger;
         _sessionUpdateOptions = sessionUpdateOptions.Value;
@@ -33,6 +34,8 @@ public class Worker : IHostedService
             _audioService.StartRecordingAsync();
             _logger.LogInformation("OnPlaybackStopped and Recording");
         };
+        
+        _lcdService = lcdService;
     }
 
     private async Task HandleAudioDataAvailable(byte[] obj)
@@ -105,6 +108,8 @@ public class Worker : IHostedService
                 // 用户音频转文本完成
                 _logger.LogInformation($"User: {baseMessage.Transcript}");
                 nowUserMessage = baseMessage.Transcript;
+                // 更新LCD显示器上的用户文本
+                await _lcdService.UpdateUserTextAsync(nowUserMessage);
                 break;
             case "response.content_part.added":
                 // AI 准备文本回复
@@ -113,6 +118,8 @@ public class Worker : IHostedService
             case "response.audio_transcript.delta":
                 // AI 文本回复
                 nowAIMessage += baseMessage.Delta;
+                // 更新LCD显示器上的AI文本
+                await _lcdService.UpdateAiTextAsync(nowAIMessage);
                 //_logger.LogInformation(baseMessage.Delta);
                 break;
             case "response.audio_transcript.done":

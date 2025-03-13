@@ -34,8 +34,10 @@ class Program
                 services.Configure<RealtimeAPIOptions>(context.Configuration.GetSection("RealtimeAPI"));
                 services.Configure<SessionUpdateOptions>(context.Configuration.GetSection("SessionUpdate"));
                 services.Configure<AudioSettings>(context.Configuration.GetSection("AudioSettings"));
+                services.Configure<LcdSettings>(context.Configuration.GetSection("LcdSettings"));
                 services.AddSingleton<AudioService>();
                 services.AddSingleton<WebSocketService>();
+                services.AddSingleton<LcdService>();
                 services.AddHostedService<Worker>();
             });
 }
