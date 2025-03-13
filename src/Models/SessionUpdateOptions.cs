@@ -7,6 +7,9 @@ public class SessionUpdateOptions
     
     [JsonPropertyName("voice")]
     public string Voice { get; set; }
+
+    [JsonPropertyName("input_audio_transcription")]
+    public InputAudioTranscription InputAudioTranscription { get; set; }
     
     [JsonPropertyName("turn_detection")]
     public TurnDetection TurnDetection { get; set; }
@@ -20,8 +23,21 @@ public class SessionUpdateOptions
         Voice = "alloy";
         TurnDetection = new TurnDetection();
         Temperature = 0.5;
+        InputAudioTranscription = new InputAudioTranscription();
     }
 }
+
+public class InputAudioTranscription{
+    
+    [JsonPropertyName("model")]
+    public string Model { get; set; }
+
+    public InputAudioTranscription()
+    {
+        Model = "whisper-1";
+    }
+}
+
 
 public class TurnDetection{
     [JsonPropertyName("type")]
