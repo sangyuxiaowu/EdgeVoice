@@ -28,6 +28,11 @@ public class Worker : IHostedService
 
         _audioService = audioService;
         _audioService.OnAudioDataAvailable += HandleAudioDataAvailable;
+        _audioService.OnPlaybackStopped += () =>
+        {
+            _audioService.StartRecordingAsync();
+            _logger.LogInformation("OnPlaybackStopped and Recording");
+        };
     }
 
     private async Task HandleAudioDataAvailable(byte[] obj)
@@ -44,7 +49,8 @@ public class Worker : IHostedService
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         await _webSocketService.ConnectAsync();
-        await _audioService.StartRecordingAsync();
+        _audioService.StartRecordingAsync();
+        _logger.LogInformation("Recording");
         //await TestSendAsync();
         //_audioService.RecordAudio("output.wav", 10);
         //_audioService.PlayAudio("output.wav");
@@ -92,6 +98,8 @@ public class Worker : IHostedService
             case "input_audio_buffer.committed":
                 // 用户音频提交
                 _logger.LogInformation("User audio committed.");
+                // 停止录音
+                _audioService.StopRecording();
                 break;
             case "conversation.item.input_audio_transcription.completed":
                 // 用户音频转文本完成
@@ -115,10 +123,12 @@ public class Worker : IHostedService
                 // AI 音频回复
                 // base64 解码
                 var audioData = Convert.FromBase64String(baseMessage.Delta);
-                await _audioService.PlayAudioAsync(audioData);
+                await _audioService.SaveAudio(baseMessage.ResponseId, audioData);
+                //await _audioService.PlayAudioAsync(audioData);
                 break;
             case "response.audio.done":
                 // 音频回复完成
+                await _audioService.PlayAudio(baseMessage.ResponseId);
                 break;
             case "conversation.item.created":
             case "response.output_item.added":
