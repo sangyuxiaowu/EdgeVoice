@@ -142,12 +142,7 @@ public class AudioService : IDisposable
 
     private void Play(byte[] pcmData)
     {
-        // 创建 WAV 头
-        byte[] wavHeader = CreateWavHeader(22050, 16, 2);
-        // 组合 WAV 头和 PCM 数据
-        byte[] wavData = new byte[wavHeader.Length + pcmData.Length];
-        wavHeader.CopyTo(wavData, 0);
-        pcmData.CopyTo(wavData, wavHeader.Length);
+        var wavData = CreateWavHeader(22050, 16, 2).Concat(pcmData).ToArray();
         //using var alsaDevice = AlsaDeviceBuilder.Create(_settings);
         _alsaDevice.Play(new MemoryStream(wavData), _cancellationTokenSourcePlayback.Token);
     }
