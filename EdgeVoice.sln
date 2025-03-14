@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CsharpWssRealtimeAPI", "src\CsharpWssRealtimeAPI.csproj", "{6EA6B784-1929-4ACE-BA2B-CF958BE4AACC}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EdgeVoice", "src\EdgeVoice.csproj", "{6EA6B784-1929-4ACE-BA2B-CF958BE4AACC}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Alsa.Net", "..\Alsa.Net\Alsa.Net.csproj", "{B96233B1-3A91-4018-93CF-F6828B6FE603}"
 EndProject

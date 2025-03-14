@@ -1,1 +1,1 @@
-dotnet publish ./src/CsharpWssRealtimeAPI.csproj -r linux-arm -p:PublishSingleFile=true -f net9.0 --self-contained=false -o ./publish/linux-arm
+dotnet publish ./src/EdgeVoice.csproj -r linux-arm -p:PublishSingleFile=true -f net9.0 --self-contained=false -o ./publish/linux-arm
