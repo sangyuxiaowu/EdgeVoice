@@ -322,7 +322,7 @@ public class LcdService : IDisposable
         float fontSize = paint.TextSize;
         // 考虑两边的安全距离
         int effectiveWidth = _settings.Width - (CornerSafetyMargin * 2);
-        int charsPerLine = (int)((effectiveWidth - x) / (fontSize / 2)); // 根据字体大小计算每行字符数
+        int charsPerLine = (int)((effectiveWidth - x) / (fontSize / 2)) / 2; // 根据字体大小计算每行字符数
         float yPos = y;
         
         for (int i = 0; i < text.Length; i += charsPerLine)

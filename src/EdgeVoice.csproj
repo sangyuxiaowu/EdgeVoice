@@ -8,9 +8,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.3" />
     <PackageReference Include="Alsa.Net" Version="1.0.8" />
-    <PackageReference Include="Sang.IoT.NV3030B" Version="1.0.2" />
+    <PackageReference Include="Sang.IoT.NV3030B" Version="1.0.3" />
   </ItemGroup>
 
   <ItemGroup>
