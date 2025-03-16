@@ -22,6 +22,7 @@ public class Worker : IHostedService
     {
         _logger = logger;
         _sessionUpdateOptions = sessionUpdateOptions.Value;
+        _lcdService = lcdService;
         
         _webSocketService = webSocketService;
         _webSocketService.OnMessageReceived += HandleWebSocketMessage;
@@ -31,11 +32,11 @@ public class Worker : IHostedService
         _audioService.OnAudioDataAvailable += HandleAudioDataAvailable;
         _audioService.OnPlaybackStopped += () =>
         {
+            _lcdService.UpdateStatus(withImg: false);
             _audioService.StartRecordingAsync();
             _logger.LogInformation("OnPlaybackStopped and Recording");
         };
         
-        _lcdService = lcdService;
     }
 
     private async Task HandleAudioDataAvailable(byte[] obj)
@@ -52,6 +53,7 @@ public class Worker : IHostedService
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         await _webSocketService.ConnectAsync();
+        _lcdService.UpdateStatus();
         _audioService.StartRecordingAsync();
         _logger.LogInformation("Recording");
         //await TestSendAsync();
@@ -89,6 +91,8 @@ public class Worker : IHostedService
                 break;
             case "session.updated":
                 // 更新配置成功
+                _logger.LogInformation("Session updated.");
+                _logger.LogInformation(message);
                 break;
             case "input_audio_buffer.speech_started":
                 // 用户开始说话

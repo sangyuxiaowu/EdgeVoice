@@ -8,6 +8,7 @@ using System.Drawing;
 using Iot.Device.Graphics.SkiaSharpAdapter;
 using SkiaSharp;
 using Iot.Device.Graphics;
+using System.Threading.Tasks;
 
 public class LcdService : IDisposable
 {
@@ -21,8 +22,9 @@ public class LcdService : IDisposable
     private CancellationTokenSource _displayUpdateCts;
     private bool _isUpdating = false;
     
-    // 滚动文本长度限制
-    private const int MaxScrollTextLength = 100;
+    // 文本长度限制
+    private const int MaxUserTextLength = 50;
+    private const int MaxAITextLength = 100;
     
     // 圆角安全距离
     private const int CornerSafetyMargin = 15;
@@ -71,7 +73,7 @@ public class LcdService : IDisposable
     }
 
     // 初始化显示器
-    private void InitializeDisplay()
+    private async Task InitializeDisplay()
     {
         _logger.LogInformation($"初始化NV3030B显示器 (SPI总线: {_settings.SpiBus}, 芯片: {_settings.SpiChip})");
         
@@ -102,41 +104,36 @@ public class LcdService : IDisposable
         _bitmapImage = new SKBitmap(_settings.Width, _settings.Height, false);
 
         // 设置背光
-        _display.SetBacklight(80);
-        _display.ClearScreen(Color.Black, true);
-        // 显示欢迎消息
-        DrawWelcomeScreen();
+        //_display.SetBacklight(80);
+        _display.ClearScreen(Color.Black, false);
+        _display.SendFrame(true);
     }
-    
-    private void DrawWelcomeScreen()
+
+    public void UpdateStatus(string text = "聆听中", bool withImg = true)
     {
-        using (var canvas = new SKCanvas(_bitmapImage))
-        {
-            // 清空画布
-            canvas.Clear(SKColors.Black);
-            
-            // 创建画笔
-            using (var paint = new SKPaint())
-            {
-                paint.Color = SKColors.White;
-                paint.TextSize = 24;
-                paint.IsAntialias = true;
-                paint.Typeface = _typeface;
-                
-                // 考虑圆角安全距离
-                canvas.DrawText("欢迎使用AI助手", CornerSafetyMargin, 40 + CornerSafetyMargin, paint);
-                
-                paint.Color = SKColors.Cyan;
-                paint.TextSize = 20;
-                canvas.DrawText("等待对话开始...", CornerSafetyMargin, 80 + CornerSafetyMargin, paint);
-            }
+        if (!_isInitialized) return;
+
+        if (withImg){
+            _display.DrawBitmap(BitmapImage.CreateFromFile("img/p1.png") , new Point(0,0), new Rectangle(0, 0, _settings.Width, _settings.Height), false);
         }
 
-        var memoryStream = new MemoryStream(_bitmapImage.Encode(SKEncodedImageFormat.Jpeg, 80).ToArray());
-        // 将绘制的内容显示到屏幕
-        _display.DrawBitmap(BitmapImage.CreateFromStream(memoryStream) , new Point(0,0), new Rectangle(0, 0, _settings.Width, _settings.Height), true);
+        using(var textimg = new SKBitmap(_settings.Width, 80)){
+            using(var canvas = new SKCanvas(textimg)){
+                canvas.Clear(SKColors.Black);
+                using (var paint = new SKPaint())
+                {
+                    paint.IsAntialias = true;
+                    paint.Typeface = _typeface;
+                    paint.Color = SKColors.White;
+                    paint.TextSize = 50;
+                    canvas.DrawText(text, 40, 60, paint);
+                }
+            }
+            _display.DrawBitmap(BitmapImage.CreateFromStream(new MemoryStream(textimg.Encode(SKEncodedImageFormat.Jpeg, 80).ToArray())) , new Point(0,0), new Rectangle(0, 0, _settings.Width, 80), false);
+        }
+        _display.SendFrame(true);
     }
-
+    
     private async void StartDisplayUpdateLoop()
     {
         _isUpdating = true;
@@ -253,52 +250,52 @@ public class LcdService : IDisposable
                     // 考虑圆角安全距离调整标题和分隔线位置
                     paint.Color = SKColors.Yellow;
                     paint.TextSize = 20;
-                    canvas.DrawText("用户:", CornerSafetyMargin, 25 + CornerSafetyMargin, paint);
+                    canvas.DrawText("用户:", 50, 25 , paint);
                     
                     // 绘制分隔线，考虑圆角
                     paint.Color = SKColors.Gray;
                     paint.StrokeWidth = 1;
                     canvas.DrawLine(
-                        CornerSafetyMargin, 35 + CornerSafetyMargin, 
-                        _settings.Width - CornerSafetyMargin, 35 + CornerSafetyMargin, 
+                        CornerSafetyMargin, 35, 
+                        _settings.Width - CornerSafetyMargin, 35, 
                         paint);
                     
                     // 处理用户文本
                     string userDisplayText = _currentUserText;
-                    if (userDisplayText.Length > MaxScrollTextLength)
+                    if (userDisplayText.Length > MaxUserTextLength)
                     {
-                        userDisplayText = userDisplayText.Substring(0, MaxScrollTextLength) + "...";
+                        userDisplayText = userDisplayText.Substring(0, MaxUserTextLength) + "...";
                     }
                     
                     // 用户文本换行显示，考虑圆角
                     paint.Color = SKColors.White;
-                    paint.TextSize = 16;
-                    WrapAndDrawText(canvas, paint, userDisplayText, CornerSafetyMargin, 55 + CornerSafetyMargin);
+                    paint.TextSize = 18;
+                    WrapAndDrawText(canvas, paint, userDisplayText.Trim(), CornerSafetyMargin, 55);
                     
                     // 绘制AI回复标题和分隔线，考虑圆角
                     paint.Color = SKColors.Green;
                     paint.TextSize = 20;
-                    canvas.DrawText("AI:", CornerSafetyMargin, 135 + CornerSafetyMargin/2, paint);
+                    canvas.DrawText("AI:", 50, 125, paint);
                     
                     // 绘制分隔线，考虑圆角
                     paint.Color = SKColors.Gray;
                     paint.StrokeWidth = 1;
                     canvas.DrawLine(
-                        CornerSafetyMargin, 145 + CornerSafetyMargin/2, 
-                        _settings.Width - CornerSafetyMargin, 145 + CornerSafetyMargin/2, 
+                        CornerSafetyMargin, 135, 
+                        _settings.Width - CornerSafetyMargin, 135, 
                         paint);
                     
                     // 处理AI文本
                     string aiDisplayText = _currentAiText;
-                    if (aiDisplayText.Length > MaxScrollTextLength)
+                    if (aiDisplayText.Length > MaxAITextLength)
                     {
-                        aiDisplayText = aiDisplayText.Substring(0, MaxScrollTextLength) + "...";
+                        aiDisplayText = aiDisplayText.Substring(0, MaxAITextLength) + "...";
                     }
                     
                     // AI文本换行显示，考虑圆角
                     paint.Color = SKColors.Cyan;
-                    paint.TextSize = 16;
-                    WrapAndDrawText(canvas, paint, aiDisplayText, CornerSafetyMargin, 165 + CornerSafetyMargin/2);
+                    paint.TextSize = 18;
+                    WrapAndDrawText(canvas, paint, aiDisplayText, CornerSafetyMargin, 155);
                 }
             }
             var memoryStream = new MemoryStream(_bitmapImage.Encode(SKEncodedImageFormat.Jpeg, 80).ToArray());
@@ -320,9 +317,9 @@ public class LcdService : IDisposable
             return;
             
         float fontSize = paint.TextSize;
-        // 考虑两边的安全距离
-        int effectiveWidth = _settings.Width - (CornerSafetyMargin * 2);
-        int charsPerLine = (int)((effectiveWidth - x) / (fontSize / 2)) / 2; // 根据字体大小计算每行字符数
+        // 考虑两边的安全距离，一边够了
+        int effectiveWidth = _settings.Width - CornerSafetyMargin;
+        int charsPerLine = (int)((effectiveWidth - x) / fontSize ); // 根据字体大小计算每行字符数
         float yPos = y;
         
         for (int i = 0; i < text.Length; i += charsPerLine)
@@ -335,7 +332,7 @@ public class LcdService : IDisposable
             yPos += fontSize + 4; // 行间距
             
             // 防止绘制超出屏幕底部安全区域
-            if (yPos > _settings.Height - fontSize - CornerSafetyMargin)
+            if (yPos > _settings.Height - fontSize)
                 break;
         }
     }
