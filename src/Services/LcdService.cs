@@ -21,10 +21,6 @@ public class LcdService : IDisposable
     private CancellationTokenSource _displayUpdateCts;
     private bool _isUpdating = false;
     
-    // 文本滚动索引
-    private int _userTextScrollIndex = 0;
-    private int _aiTextScrollIndex = 0;
-    
     // 滚动文本长度限制
     private const int MaxScrollTextLength = 100;
     
@@ -36,7 +32,7 @@ public class LcdService : IDisposable
     private SKBitmap _bitmapImage;
 
     // 增加内容变化标志
-    private bool _contentChanged = true;
+    private bool _contentChanged = false;
     private string _lastUserText = "";
     private string _lastAiText = "";
 
@@ -74,6 +70,7 @@ public class LcdService : IDisposable
         }
     }
 
+    // 初始化显示器
     private void InitializeDisplay()
     {
         _logger.LogInformation($"初始化NV3030B显示器 (SPI总线: {_settings.SpiBus}, 芯片: {_settings.SpiChip})");
@@ -102,7 +99,7 @@ public class LcdService : IDisposable
         }
 
         // 初始化位图
-        _bitmapImage = new SKBitmap(_settings.Width, _settings.Height, true);
+        _bitmapImage = new SKBitmap(_settings.Width, _settings.Height, false);
 
         // 设置背光
         _display.SetBacklight(80);
@@ -134,9 +131,10 @@ public class LcdService : IDisposable
                 canvas.DrawText("等待对话开始...", CornerSafetyMargin, 80 + CornerSafetyMargin, paint);
             }
         }
-        
+
+        var memoryStream = new MemoryStream(_bitmapImage.Encode(SKEncodedImageFormat.Jpeg, 80).ToArray());
         // 将绘制的内容显示到屏幕
-        _display.DrawBitmap(BitmapImage.CreateFromStream(new MemoryStream(_bitmapImage.Encode(SKEncodedImageFormat.Png, 100).ToArray())) , new Point(0,0), new Rectangle(0, 0, _settings.Width, _settings.Height), true);
+        _display.DrawBitmap(BitmapImage.CreateFromStream(memoryStream) , new Point(0,0), new Rectangle(0, 0, _settings.Width, _settings.Height), true);
     }
 
     private async void StartDisplayUpdateLoop()
@@ -147,15 +145,13 @@ public class LcdService : IDisposable
         {
             while (!_displayUpdateCts.Token.IsCancellationRequested)
             {
-                bool updated = false;
-                
+
                 await _semaphore.WaitAsync();
                 try 
                 {
                     // 只有当内容变化时才更新显示
                     if (_contentChanged)
                     {
-                        updated = true;
                         await UpdateDisplayAsync();
                         _contentChanged = false;
                         
@@ -169,10 +165,7 @@ public class LcdService : IDisposable
                     _semaphore.Release();
                 }
                 
-                // 如果更新了显示，使用正常的刷新延迟
-                // 如果没有更新，使用较长的延迟以减少轮询频率
-                int delay = updated ? _settings.RefreshDelay : Math.Max(_settings.RefreshDelay * 5, 1000);
-                await Task.Delay(delay, _displayUpdateCts.Token);
+                await Task.Delay(_settings.RefreshDelay, _displayUpdateCts.Token);
             }
         }
         catch (OperationCanceledException)
@@ -189,6 +182,11 @@ public class LcdService : IDisposable
         }
     }
 
+    /// <summary>
+    /// 更新用户文本
+    /// </summary>
+    /// <param name="text"></param>
+    /// <returns></returns>
     public async Task UpdateUserTextAsync(string text)
     {
         if (!_isInitialized) return;
@@ -200,8 +198,6 @@ public class LcdService : IDisposable
             if (_currentUserText != text)
             {
                 _currentUserText = text;
-                // 重置滚动索引
-                _userTextScrollIndex = 0;
                 // 标记内容已变化
                 _contentChanged = true;
             }
@@ -212,6 +208,11 @@ public class LcdService : IDisposable
         }
     }
 
+    /// <summary>
+    /// 更新AI文本
+    /// </summary>
+    /// <param name="text"></param>
+    /// <returns></returns>
     public async Task UpdateAiTextAsync(string text)
     {
         if (!_isInitialized) return;
@@ -223,8 +224,6 @@ public class LcdService : IDisposable
             if (_currentAiText != text)
             {
                 _currentAiText = text;
-                // 重置滚动索引
-                _aiTextScrollIndex = 0;
                 // 标记内容已变化
                 _contentChanged = true;
             }
@@ -302,8 +301,9 @@ public class LcdService : IDisposable
                     WrapAndDrawText(canvas, paint, aiDisplayText, CornerSafetyMargin, 165 + CornerSafetyMargin/2);
                 }
             }
+            var memoryStream = new MemoryStream(_bitmapImage.Encode(SKEncodedImageFormat.Jpeg, 80).ToArray());
             // 更新显示
-            _display.DrawBitmap(BitmapImage.CreateFromStream(new MemoryStream(_bitmapImage.Encode(SKEncodedImageFormat.Png, 100).ToArray())) , new Point(0,0), new Rectangle(0, 0, _settings.Width, _settings.Height), true);
+            _display.DrawBitmap(BitmapImage.CreateFromStream(memoryStream) , new Point(0,0), new Rectangle(0, 0, _settings.Width, _settings.Height), true);
             
             _logger.LogDebug("显示已更新");
         }
