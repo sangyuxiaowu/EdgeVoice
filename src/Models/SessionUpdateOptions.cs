@@ -13,6 +13,9 @@ public class SessionUpdateOptions
     
     [JsonPropertyName("turn_detection")]
     public TurnDetection TurnDetection { get; set; }
+
+    [JsonPropertyName("max_response_output_tokens")]
+    public int MaxResponseOutputTokens { get; set; }
     
     [JsonPropertyName("temperature")]
     public double Temperature { get; set; }
@@ -23,6 +26,7 @@ public class SessionUpdateOptions
         Voice = "alloy";
         TurnDetection = new TurnDetection();
         Temperature = 0.5;
+        MaxResponseOutputTokens = 1000;
         InputAudioTranscription = new InputAudioTranscription();
     }
 }
