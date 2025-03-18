@@ -32,7 +32,7 @@ sudo apt-get install libasound2-dev
 - [纯前端使用 Azure OpenAI Realtime API 打造语音助手](https://mp.weixin.qq.com/s/sNsFJaYYP1Zjf47MRRrytw)
 - [在Linux开发板中使用.NET实现音频开发](https://mp.weixin.qq.com/s/IqV0U1g_C0QrZLeOMRDX_g)
 - [让屏幕动起来：使用.NET玩转NV3030B驱动](https://mp.weixin.qq.com/s/u0QxCqKDMjsueIXr_tCPRg)
-- [使用.NET Core实现一个简单的语音识别](https://github.com/sangyuxiaowu/WssRealtimeAPI?wt.mc_id=DT-MVP-5005195)
+- [WssRealtimeAPI](https://github.com/sangyuxiaowu/WssRealtimeAPI?wt.mc_id=DT-MVP-5005195)
 - [NV3030B的.NET 驱动](https://github.com/sangyuxiaowu/NV3030B?wt.mc_id=DT-MVP-5005195)
 
 ## 发布
