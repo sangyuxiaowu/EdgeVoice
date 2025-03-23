@@ -44,3 +44,12 @@ dotnet publish ./src/EdgeVoice.csproj -r linux-arm -p:PublishSingleFile=true -f 
 - 树莓派需要修改 `linux-arm` 为 `linux-arm64`
 - 如果需要框架依赖，删除 `--self-contained=false` 参数即可
 - 使用的库 Alsa 不支持 Windows，所以 Windows 下无法运行
+
+本项目 Release 提供了框架依赖的版本，可以直接下载使用。需要安装 .NET 9.0 运行时。可使用  `doc\install_dotnet_sdk_9.sh` 脚本安装。
+
+## 接入 Azure OpenAI Realtime API
+
+- 前往[Azure AI Foundry](https://oai.azure.com/?wt.mc_id=DT-MVP-5005195)部署实时音视频资源
+- 配置 `appsettings.json` 中的 `AzureOpenAIRealtimeApi` 节点
+- 无显示屏则将 `LcdSettings` 节点的 `SpiBus` 设置为 `-1` 即可
+- 运行程序即可
