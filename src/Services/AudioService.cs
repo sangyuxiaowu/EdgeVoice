@@ -182,7 +182,7 @@ public class AudioService : IDisposable
 
     private void Play(byte[] pcmData)
     {
-        var wavData = CreateWavHeader(22050, 16, 2).Concat(pcmData).ToArray();
+        var wavData = CreateWavHeader(24000, 16, 2).Concat(pcmData).ToArray();
         //using var alsaDevice = AlsaDeviceBuilder.Create(_settings);
         _alsaDevice.Play(new MemoryStream(wavData), _cancellationTokenSourcePlayback.Token);
     }
@@ -206,7 +206,7 @@ public class AudioService : IDisposable
         byte[] wavData;
         if (!File.Exists(filePath))
         {
-            byte[] wavHeader = CreateWavHeader(22050, 16, 2);
+            byte[] wavHeader = CreateWavHeader(24000, 16, 2);
             wavData = wavHeader.Concat(monoData).ToArray();
             await File.WriteAllBytesAsync(filePath, wavData);
         }
