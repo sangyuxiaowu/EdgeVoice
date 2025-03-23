@@ -42,6 +42,13 @@ public class LcdService : IDisposable
     {
         _logger = logger;
         _settings = settings.Value;
+
+        if(_settings == null || _settings.SpiBus == -1  || _settings.SpiChip == -1)
+        {
+            _logger.LogWarning("未配置显示器，将禁用显示功能");
+            return;
+        }
+
         _displayUpdateCts = new CancellationTokenSource();
         
         try
