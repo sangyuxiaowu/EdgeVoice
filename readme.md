@@ -34,6 +34,8 @@ sudo apt-get install libasound2-dev
 - [让屏幕动起来：使用.NET玩转NV3030B驱动](https://mp.weixin.qq.com/s/u0QxCqKDMjsueIXr_tCPRg)
 - [WssRealtimeAPI](https://github.com/sangyuxiaowu/WssRealtimeAPI?wt.mc_id=DT-MVP-5005195)
 - [NV3030B的.NET 驱动](https://github.com/sangyuxiaowu/NV3030B?wt.mc_id=DT-MVP-5005195)
+- [Linux 开发板接入OpenAI 实时语音聊天实战](https://mp.weixin.qq.com/s/3DJFpf-EUKzTMl-Z4-w9RA)
+- [在Luckfox上使用EdgeVoice语音助手](https://mp.weixin.qq.com/s/QNLgislFnzevWvhWC74wRQ)
 
 ## 发布
 
